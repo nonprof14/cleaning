@@ -61,14 +61,26 @@ def classify_page(url: str, title: str, content: str) -> str:
     Returns: 'character', 'episode', 'transcript', 'location', or 'other'
     """
     url_lower = url.lower()
+    title_lower = title.lower()
 
-    # Transcripts
+    # Transcripts - check URL and title
     if '/transcript' in url_lower or url_lower.endswith('_transcript'):
         return 'transcript'
+    if 'transcript' in title_lower:
+        return 'transcript'
 
-    # Episodes - check URL patterns
-    if any(x in url_lower for x in ['_(episode)', '_(short)', '_(special)']):
+    # Episodes - check URL patterns and title
+    episode_url_patterns = ['_(episode)', '_(short)', '_(special)', '/episode', '/list_of_']
+    if any(x in url_lower for x in episode_url_patterns):
         return 'episode'
+
+    # Check title for episode indicators
+    episode_title_patterns = ['episode', 'season', 'special']
+    if any(x in title_lower for x in episode_title_patterns):
+        # Verify it's really an episode by checking content
+        content_lower = content[:1000].lower()
+        if any(x in content_lower for x in ['airdate', 'air date', 'production code', 'season', 'episode number']):
+            return 'episode'
 
     # Locations
     location_keywords = [
@@ -174,7 +186,18 @@ def detect_content_category(text: str, page_type: str) -> str:
     if page_type == "character":
         if any(word in text_lower for word in ["personality", "behavior", "traits", "known for being", "is often"]):
             return "personality"
-        if any(word in text_lower for word in ["relationship", "friend", "enemy", "family", "married", "son", "daughter"]):
+        # More specific relationship detection to avoid false positives
+        relationship_phrases = [
+            "relationship with", "relationships with", "is friends with", "are friends",
+            "best friend", "close friend", "enemy of", "enemies with",
+            "married to", "spouse", "wife of", "husband of",
+            "father of", "mother of", "parent", "sibling",
+            "friendship with", "rivalry with", "acquaintance"
+        ]
+        if any(phrase in text_lower for phrase in relationship_phrases):
+            return "relationships"
+        # Also check for section headers
+        if "relationships" in text_lower[:100]:  # Check beginning of chunk for section header
             return "relationships"
         if any(word in text_lower for word in ["born", "created", "origin", "history", "backstory", "early life"]):
             return "biography"
@@ -210,17 +233,35 @@ def detect_content_category(text: str, page_type: str) -> str:
     return "general"
 
 
+def clean_page_title(title: str) -> str:
+    """
+    Clean page title by removing wiki suffixes.
+    Example: "Patrick Star | Encyclopedia SpongeBobia | Fandom" -> "Patrick Star"
+    """
+    # Remove common wiki suffixes
+    suffixes = [
+        ' | Encyclopedia SpongeBobia | Fandom',
+        ' | Encyclopedia SpongeBobia',
+        ' | Fandom',
+        ' - Encyclopedia SpongeBobia',
+        ' - Fandom'
+    ]
+
+    clean_title = title
+    for suffix in suffixes:
+        if suffix in clean_title:
+            clean_title = clean_title.split(suffix)[0].strip()
+
+    return clean_title
+
+
 def is_main_character_page(page_title: str) -> bool:
     """
     Check if the page is about a main character.
     Returns True if page_title matches any main character name.
     """
-    page_title_clean = page_title.lower()
-
-    # Remove common suffixes from titles
-    for suffix in [' | encyclopedia spongebobia', ' | fandom']:
-        if suffix in page_title_clean:
-            page_title_clean = page_title_clean.split(suffix)[0].strip()
+    # Clean the title first
+    page_title_clean = clean_page_title(page_title).lower()
 
     for char_name in MAIN_CHARACTERS:
         if char_name.lower() == page_title_clean or char_name.lower() in page_title_clean:
@@ -298,6 +339,9 @@ def extract_metadata(text: str, url: str, title: str, page_type: str, chunk_inde
     Extract rich metadata for a chunk.
     Returns both Pinecone and Sheets metadata.
     """
+    # Clean the page title
+    clean_title = clean_page_title(title)
+
     # Find mentioned characters (use shorter names for detection)
     characters = []
     text_lower = text.lower()
@@ -336,7 +380,7 @@ def extract_metadata(text: str, url: str, title: str, page_type: str, chunk_inde
         'metadata': {
             'sheet_row_id': chunk_id,
             'source_url': url,
-            'page_title': title,
+            'page_title': clean_title,  # Use cleaned title
             'page_type': page_type,
             'content_category': content_category,
             'chunk_index': chunk_index,
