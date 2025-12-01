@@ -49,15 +49,43 @@ For example:
 cd ~/cleaning/spongebob_processor
 ```
 
-### Step 3: Install Dependencies
+### Step 3: Create a Virtual Environment
+
+Python best practice is to use a virtual environment to avoid conflicts:
 
 ```bash
-pip3 install -r requirements.txt
+python3 -m venv venv
+```
+
+This creates a `venv` folder in your project directory.
+
+### Step 4: Activate the Virtual Environment
+
+**Mac/Linux:**
+```bash
+source venv/bin/activate
+```
+
+**Windows:**
+```bash
+venv\Scripts\activate
+```
+
+You should see `(venv)` appear at the start of your terminal prompt.
+
+### Step 5: Install Dependencies
+
+Now install the required packages:
+
+```bash
+pip install -r requirements.txt
 ```
 
 This installs `tqdm` for progress bars.
 
-### Step 4: Place Your Input File
+**Note:** If you get an "externally-managed-environment" error, make sure you activated the virtual environment in Step 4.
+
+### Step 6: Place Your Input File
 
 Put your Apify JSON export in this folder and name it:
 
@@ -71,11 +99,13 @@ apify_export.json
 INPUT_FILE = "/path/to/your/dataset_spongebob_wiki.json"
 ```
 
-### Step 5: Run the Processor
+### Step 7: Run the Processor
 
 ```bash
 python3 process.py
 ```
+
+**Important:** Always activate the virtual environment (Step 4) before running the script!
 
 ## What to Expect
 
@@ -289,7 +319,32 @@ Edit `config.py` to customize:
 
 ### Error: 'tqdm' module not found
 
-**Solution:** Run `pip3 install -r requirements.txt` again
+**Solution:** Make sure you activated the virtual environment first:
+```bash
+source venv/bin/activate  # Mac/Linux
+# OR: venv\Scripts\activate  # Windows
+```
+Then run: `pip install -r requirements.txt`
+
+### Error: externally-managed-environment
+
+**Solution:** This happens when trying to install packages system-wide. Use a virtual environment instead:
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate it
+source venv/bin/activate  # Mac/Linux
+# OR: venv\Scripts\activate  # Windows
+
+# Now install packages
+pip install -r requirements.txt
+```
+
+**Alternative:** If you really want to install system-wide (not recommended), use:
+```bash
+pip3 install --user -r requirements.txt
+```
 
 ### Processing takes too long
 
@@ -430,23 +485,31 @@ Ready for:
 # 1. Navigate to directory
 cd ~/cleaning/spongebob_processor
 
-# 2. Install dependencies
-pip3 install -r requirements.txt
+# 2. Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Mac/Linux
+# OR: venv\Scripts\activate  # On Windows
 
-# 3. Place your input file
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Place your input file
 cp ~/Downloads/dataset_spongebob_wiki.json ./apify_export.json
 
-# 4. Run processor
+# 5. Run processor
 python3 process.py
 
-# 5. Check Pinecone output (no full_text)
+# 6. Check Pinecone output (no full_text)
 head -n 1 pinecone_chunks.jsonl | python3 -m json.tool
 
-# 6. Check CSV output (has full_text)
+# 7. Check CSV output (has full_text)
 head -n 2 sheets_chunks.csv
 
-# 7. View stats
+# 8. View stats
 cat processing_stats.json
+
+# 9. Deactivate virtual environment when done
+deactivate
 ```
 
 ## License
