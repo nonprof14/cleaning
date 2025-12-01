@@ -4,7 +4,8 @@ Configuration settings for SpongeBob Wiki Data Processor
 
 # Input/Output paths
 INPUT_FILE = "apify_export.json"
-OUTPUT_FILE = "spongebob_chunks.jsonl"
+PINECONE_OUTPUT_FILE = "pinecone_chunks.jsonl"
+SHEETS_OUTPUT_FILE = "sheets_chunks.csv"
 STATS_FILE = "processing_stats.json"
 
 # Chunking settings
@@ -27,8 +28,31 @@ NAMESPACES = {
     'other': 'wiki-other'
 }
 
-# Main characters to detect in content
+# Main characters to detect in content and page titles
 MAIN_CHARACTERS = [
+    'SpongeBob SquarePants',
+    'SpongeBob',
+    'Patrick Star',
+    'Patrick',
+    'Squidward Tentacles',
+    'Squidward',
+    'Mr. Krabs',
+    'Eugene H. Krabs',
+    'Plankton',
+    'Sheldon J. Plankton',
+    'Sandy Cheeks',
+    'Sandy',
+    'Gary the Snail',
+    'Gary',
+    'Mrs. Puff',
+    'Pearl Krabs',
+    'Pearl',
+    'Karen Plankton',
+    'Karen'
+]
+
+# Main character names (for detecting in content)
+CHARACTER_MENTION_NAMES = [
     'SpongeBob', 'Patrick', 'Squidward', 'Mr. Krabs', 'Plankton',
     'Sandy', 'Gary', 'Mrs. Puff', 'Pearl', 'Karen',
     'Mermaid Man', 'Barnacle Boy', 'Larry', 'Flying Dutchman',
@@ -62,25 +86,23 @@ SKIP_URL_PATTERNS = [
     '/Forum:',
 ]
 
-# Section categories for content classification
-SECTION_CATEGORIES = {
-    # Character sections
-    'personality': ['personality', 'traits', 'behavior', 'characteristics'],
-    'biography': ['biography', 'history', 'background', 'early life', 'life'],
-    'relationships': ['relationships', 'friends', 'family', 'enemies'],
-    'appearance': ['appearance', 'looks', 'physical'],
-    'abilities': ['abilities', 'powers', 'skills', 'talents'],
-    'quotes': ['quotes', 'catchphrases', 'sayings'],
-
-    # Episode sections
-    'plot': ['plot', 'synopsis', 'summary', 'storyline'],
-    'characters': ['characters', 'cast', 'appearances'],
-
-    # Location sections
-    'description': ['description', 'overview', 'about'],
-    'features': ['features', 'layout', 'interior', 'exterior', 'design'],
-    'residents': ['residents', 'employees', 'inhabitants', 'staff'],
-}
+# CSV output settings
+CSV_HEADERS = [
+    'chunk_id',
+    'namespace',
+    'source_url',
+    'page_title',
+    'page_type',
+    'content_category',
+    'chunk_index',
+    'total_chunks',
+    'is_main_character',
+    'characters_mentioned',
+    'locations_mentioned',
+    'full_text',
+    'text_preview',
+    'word_count'
+]
 
 # Lines to remove from content
 JUNK_LINES = [

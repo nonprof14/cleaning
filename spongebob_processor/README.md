@@ -1,6 +1,8 @@
-# SpongeBob Wiki Data Processor
+# SpongeBob Wiki Data Processor v2.0
 
-This script cleans and processes the Apify wiki scrape for Pinecone vector database. It transforms raw wiki pages into clean, chunked text ready for embedding and upload.
+This script cleans and processes the Apify wiki scrape for **two outputs**:
+1. **Pinecone JSONL** - Metadata only (no full text) for vector database
+2. **Google Sheets CSV** - Complete data with full text for reference
 
 ## What This Does
 
@@ -9,7 +11,9 @@ This script cleans and processes the Apify wiki scrape for Pinecone vector datab
 3. **Classifies** pages by type (character, episode, transcript, location)
 4. **Chunks** content into ~400 token segments with overlap
 5. **Extracts** rich metadata (mentioned characters, locations, content categories)
-6. **Outputs** JSONL file ready for Pinecone upload
+6. **Outputs TWO files**:
+   - `pinecone_chunks.jsonl` - For Pinecone (text_preview only, no full_text)
+   - `sheets_chunks.csv` - For Google Sheets (includes full_text)
 
 ## Prerequisites
 
@@ -75,31 +79,36 @@ python3 process.py
 
 ## What to Expect
 
-The processor will show progress in 4 stages:
+The processor will show progress in 5 stages:
 
 ```
 ============================================================
-SpongeBob Wiki Data Processor
+SpongeBob Wiki Data Processor v2.0
 ============================================================
 
-[1/4] Loading data...
+[1/5] Loading data...
       File: apify_export.json
       Size: 54.2 MB
       Loaded: 2,147 pages
 
-[2/4] Processing pages...
+[2/5] Filtering pages...
+      Checking which pages to keep...
+
+[3/5] Processing & chunking...
       This may take a few minutes...
 
       Processing: 100%|████████████| 2147/2147 [00:45<00:00, 47.23page/s]
 
-[3/4] Writing output...
-      File: spongebob_chunks.jsonl
-      Size: 12.3 MB
+[4/5] Writing Pinecone file...
+      File: pinecone_chunks.jsonl
+      Size: 8.2 MB
 
-[4/4] Complete!
+[5/5] Writing Google Sheets file...
+      File: sheets_chunks.csv
+      Size: 14.5 MB
 
 ============================================================
-✓ PROCESSING COMPLETE
+✓ COMPLETE
 ============================================================
 
 Summary:
@@ -115,64 +124,99 @@ Summary:
     wiki-transcripts     2,891 chunks (18.7%)
     wiki-locations       1,786 chunks (11.6%)
 
-  By page type:
-    character            4,521 chunks (29.3%)
-    episode              6,234 chunks (40.4%)
-    transcript           2,891 chunks (18.7%)
-    location             1,786 chunks (11.6%)
+  By content category:
+    plot                 4,521 chunks (29.3%)
+    dialogue             2,891 chunks (18.7%)
+    personality          1,203 chunks ( 7.8%)
+    general              4,823 chunks (31.3%)
+    relationships          892 chunks ( 5.8%)
+    description          1,102 chunks ( 7.1%)
 
-Output file: spongebob_chunks.jsonl
-File size:   12.3 MB
+Files created:
+  pinecone_chunks.jsonl         → Upload to Pinecone
+  sheets_chunks.csv             → Import to Google Sheets
 
 ============================================================
-Ready for: Embedding and uploading to Pinecone
+Next steps:
+  1. Import sheets_chunks.csv into Google Sheets
+  2. Run upload_to_pinecone.py to embed and upload
 ============================================================
 
 Verifying output...
 
-Sample chunk:
+Sample Pinecone chunk:
   ID:               a3f2b1c9d4e5_0
   Namespace:        wiki-characters
   Page:             Patrick Star | Encyclopedia SpongeBobia | Fandom...
   Type:             character
   Category:         personality
+  Main Character:   True
   Characters:       Patrick, SpongeBob, Squidward, Mr. Krabs, Sandy
   Locations:        Bikini Bottom, Krusty Krab, Easter Island Head
   Chunk:            0/12
   Preview:          Patrick Star is a fictional character in the American animated...
 
-✓ Output file verified successfully
+✓ Output files verified successfully
 ```
 
 ## Output Files
 
 After running, you'll have:
 
-1. **`spongebob_chunks.jsonl`** - Clean chunks ready for Pinecone (main output)
-2. **`processing_stats.json`** - Detailed statistics about the processing
+1. **`pinecone_chunks.jsonl`** - For Pinecone vector database (8-10 MB)
+2. **`sheets_chunks.csv`** - For Google Sheets reference (14-16 MB)
+3. **`processing_stats.json`** - Detailed statistics about the processing
 
-## Output Format
+## Output Format Details
 
-Each line in `spongebob_chunks.jsonl` is a JSON object:
+### 1. Pinecone JSONL (`pinecone_chunks.jsonl`)
+
+Each line is a JSON object **without full text** (only text_preview):
 
 ```json
 {
   "id": "a3f2b1c9d4e5_0",
   "namespace": "wiki-characters",
   "metadata": {
+    "sheet_row_id": "a3f2b1c9d4e5_0",
     "source_url": "https://spongebob.fandom.com/wiki/Patrick_Star",
-    "page_title": "Patrick Star",
+    "page_title": "Patrick Star | Encyclopedia SpongeBobia | Fandom",
     "page_type": "character",
     "content_category": "personality",
     "chunk_index": 0,
     "total_chunks": 12,
+    "is_main_character": true,
     "characters_mentioned": ["Patrick", "SpongeBob", "Squidward"],
     "locations_mentioned": ["Bikini Bottom", "Krusty Krab"],
-    "text": "Full chunk text content here...",
-    "text_preview": "First 200 characters..."
+    "text_preview": "Patrick Star is one of the main characters in SpongeBob SquarePants. He is a dim-witted but well-meaning pink sea star who lives under a rock..."
   }
 }
 ```
+
+**Note:** The `text_preview` is **first 200 characters only**. There is **NO full_text** field in this file.
+
+### 2. Google Sheets CSV (`sheets_chunks.csv`)
+
+CSV with 14 columns including the **full text**:
+
+| Column | Description |
+|--------|-------------|
+| chunk_id | Unique ID (matches Pinecone id) |
+| namespace | wiki-characters, wiki-episodes, etc. |
+| source_url | Full wiki URL |
+| page_title | Character/episode/location name |
+| page_type | character, episode, transcript, location |
+| content_category | personality, relationships, plot, etc. |
+| chunk_index | Position in page (0, 1, 2...) |
+| total_chunks | Total chunks from this page |
+| is_main_character | TRUE/FALSE (for characters only) |
+| characters_mentioned | Comma-separated list |
+| locations_mentioned | Comma-separated list |
+| **full_text** | **Complete chunk text** |
+| text_preview | First 200 characters |
+| word_count | Number of words in chunk |
+
+**Important:** The CSV uses `utf-8-sig` encoding and `QUOTE_ALL` for Excel compatibility. Full text includes newlines, which are properly escaped.
 
 ## Namespaces
 
@@ -183,6 +227,46 @@ Chunks are organized into 4 Pinecone namespaces:
 - **`wiki-transcripts`** - Raw dialogue from episodes
 - **`wiki-locations`** - Location descriptions, features
 
+## Content Categories
+
+The processor detects content categories based on keywords:
+
+### Character Content
+- **personality** - Behavior, traits, "known for being", "is often"
+- **relationships** - Friends, enemies, family, "son", "daughter"
+- **biography** - Born, created, origin, history, backstory
+- **appearance** - Looks, wears, color, physical features
+- **abilities** - Skills, talents, powers, "can do"
+- **quotes** - Catchphrases, famous lines, dialogue
+
+### Episode Content
+- **plot** - Synopsis, summary, story, "begins", "ends"
+- **characters_in_episode** - Starring, featuring, appears
+
+### Transcript Content
+- **dialogue** - All transcript content
+
+### Location Content
+- **description** - Located, "is a", building overview
+- **features** - Interior, rooms, layout, design
+- **residents** - Lives, employees, owner, works
+- **history** - Built, founded, opened
+
+## Main Characters
+
+The processor identifies these as main characters (for `is_main_character` field):
+
+- SpongeBob SquarePants / SpongeBob
+- Patrick Star / Patrick
+- Squidward Tentacles / Squidward
+- Mr. Krabs / Eugene H. Krabs
+- Plankton / Sheldon J. Plankton
+- Sandy Cheeks / Sandy
+- Gary the Snail / Gary
+- Mrs. Puff
+- Pearl Krabs / Pearl
+- Karen Plankton / Karen
+
 ## Configuration
 
 Edit `config.py` to customize:
@@ -191,6 +275,7 @@ Edit `config.py` to customize:
 - **Chunking settings** - Chunk size, overlap amount
 - **Characters/locations** - What to detect in content
 - **Skip patterns** - What URL patterns to filter out
+- **CSV headers** - Column names for Google Sheets
 
 ## Troubleshooting
 
@@ -217,13 +302,43 @@ Edit `config.py` to customize:
 
 **Solution:** Check if your input file actually contains page data. The script needs pages with `text` fields.
 
+### CSV doesn't open properly in Excel
+
+**Solution:** The CSV uses `utf-8-sig` encoding. Try:
+1. Open Excel
+2. Go to Data → From Text/CSV
+3. Select `sheets_chunks.csv`
+4. Choose UTF-8 encoding
+5. Import
+
 ## Next Steps
 
-After processing, you can:
+### 1. Import to Google Sheets
 
-1. **Upload to Pinecone** - Use the output JSONL with embedding script
-2. **Inspect the data** - Open `spongebob_chunks.jsonl` in a text editor
-3. **Check statistics** - Review `processing_stats.json` for insights
+```bash
+# Option A: Upload directly
+# Go to Google Sheets → File → Import → Upload → sheets_chunks.csv
+
+# Option B: Use Google Drive
+# Upload sheets_chunks.csv to Google Drive
+# Right-click → Open with → Google Sheets
+```
+
+### 2. Upload to Pinecone
+
+Use the `pinecone_chunks.jsonl` file with your embedding script:
+
+```python
+# Example workflow (you'll need to create this script)
+# 1. Read pinecone_chunks.jsonl
+# 2. Generate embeddings using OpenAI text-embedding-3-small
+# 3. Upload to Pinecone with full_text from Google Sheets lookup
+```
+
+**Important:** The Pinecone file doesn't contain full_text. You'll need to:
+1. Store full_text in Google Sheets (already done by this processor)
+2. Use `sheet_row_id` to look up full text when generating embeddings
+3. Include the full text in the embedding process
 
 ## Technical Details
 
@@ -270,10 +385,12 @@ Removes:
 ### Metadata Extraction
 
 For each chunk:
-- **Characters mentioned** - Detected from MAIN_CHARACTERS list
+- **Characters mentioned** - Detected from CHARACTER_MENTION_NAMES list
 - **Locations mentioned** - Detected from MAIN_LOCATIONS list
-- **Content category** - Detected from section keywords (personality, plot, etc.)
+- **Content category** - Detected from keywords (personality, plot, etc.)
+- **Is main character** - TRUE if page_title matches MAIN_CHARACTERS list
 - **Unique ID** - MD5 hash of URL + chunk index
+- **Word count** - Number of words in full_text
 
 ## Support
 
@@ -299,9 +416,12 @@ Chunk: Split into ~400 token segments with overlap
   ↓
 Extract: Generate metadata (characters, locations, categories)
   ↓
-Output: spongebob_chunks.jsonl (JSONL format)
+Output 1: pinecone_chunks.jsonl (JSONL, no full_text)
+Output 2: sheets_chunks.csv (CSV with full_text)
   ↓
-Ready for: OpenAI embedding → Pinecone upload
+Ready for:
+  - Pinecone: Embed + Upload (use Google Sheets for full_text)
+  - Google Sheets: Import for reference and lookups
 ```
 
 ## Example Workflow
@@ -319,10 +439,13 @@ cp ~/Downloads/dataset_spongebob_wiki.json ./apify_export.json
 # 4. Run processor
 python3 process.py
 
-# 5. Check output
-head -n 1 spongebob_chunks.jsonl | python3 -m json.tool
+# 5. Check Pinecone output (no full_text)
+head -n 1 pinecone_chunks.jsonl | python3 -m json.tool
 
-# 6. View stats
+# 6. Check CSV output (has full_text)
+head -n 2 sheets_chunks.csv
+
+# 7. View stats
 cat processing_stats.json
 ```
 
